@@ -6,7 +6,7 @@ import bodyParser from "body-parser";
 var app = express();
 
 let personas = [];
-let Juan = new Persona("Juan", "Perez", 25);
+let Juan = new Persona("juan23", "Juan", "Perez", 25);
 personas.push(Juan);
 
 // PROCESANDO CON GET OBTENER ALGO
@@ -17,29 +17,40 @@ console.log(personas);*/
 // recuperar todos los amigos
 app.get("/amigos", function (req, res) {
   let persona;
-  let total = "Lista de amigos registrados: ";
+  let total = "Lista de amigos registrados:  \n";
   let i = 1;
-  console.log(personas);
+  console.log("Recuperando todas las personas: " + personas);
   for (let valor of personas) {
     persona = valor;
-    console.log(persona);
-    total += i + ". " + persona.nombre + " " + persona.apellido + " ";
+    console.log("Persona recuperada: " + persona.toString());
+    total +=
+      i +
+      ". Nick: " +
+      persona.nick +
+      " Credenciales: " +
+      persona.nombre +
+      " " +
+      persona.apellido +
+      " \n";
     i++;
   }
   res.send(total);
 });
 
-// recuperar un amigo en concreto, faltaría verificar que cada nombre es unico
-app.get("/amigos/:nombre", function (req, res) {
-  let nombre = req.params.nombre;
+// recuperar un amigo en concreto
+app.get("/amigos/:nick", function (req, res) {
+  let nick = req.params.nick;
   let persona;
+  console.log("Recuperando persona con nick: " + nick);
   for (let valor of personas) {
-    if (valor.nombre === nombre) {
+    if (valor.nick === nick) {
+      console.log("Amigo encontrado: " + valor.toString());
       persona = valor;
       res.send(persona);
       return;
     }
   }
+  console.log("Amigo no encontrado");
   res.send("No existe ese amigo todavía!");
 });
 
@@ -50,7 +61,7 @@ app.get("/", function (req, res) {
 
 // En localhost:3000/welcome
 app.get("/welcome", function (req, res) {
-  res.json("<b>Holi</b> Bienvenido a mi servidor http hecho con express");
+  res.json("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
 // get logo
@@ -70,59 +81,94 @@ app.post("/", function (req, res) {
 
 // En localhost:3000/welcome
 app.post("/welcome", function (req, res) {
-  res.send("<b>Holi</b> Bienvenido a mi servidor http hecho con express");
+  res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// creando nuevos usuarios con JSON
 app.post("/crear", (req, res) => {
-  let persona = new Persona(req.body.nombre, req.body.apellido, req.body.edad);
-  console.log("Nueva persona: " + persona);
+  let persona = new Persona(
+    req.body.nick,
+    req.body.nombre,
+    req.body.apellido,
+    req.body.edad
+  );
+  console.log("Intentando crear nueva persona: " + persona.nick);
+  // comprobamos que no exista ninguno con ese nick
+  for (let valor of personas) {
+    if (valor.nick === persona.nick) {
+      console.log("Ya existe un usuario con ese nick");
+
+      res.send("Ya existe ese amigo!");
+      return;
+    }
+  }
+  console.log("Persona creada: " + persona.toString());
   personas.push(persona);
   res.send(
-    `<p>Se ha creado el objeto! ${persona.nombre} ${persona.apellido} </p>`
+    `<p>Se ha creado el amigo! ${persona.nombre} ${persona.apellido} </p>`
   );
 });
 
 // PROCESANDO CON PUT ACTUALIZAR ALGO
 
 // por parametro url para actualizar solo la edad
-app.put("/actualizar/:nombre/:edad", function (req, res) {
-  let nombre = req.params.nombre;
+app.put("/actualizar/:nick/:edad", function (req, res) {
+  let nick = req.params.nick;
   let edad = req.params.edad;
   let persona;
+  console.log("Intentando actualizar persona con nick: " + nick);
 
   for (let valor of personas) {
-    if (valor.nombre === nombre) {
+    if (valor.nick === nick) {
       persona = valor;
       persona.edad = edad;
+      console.log(
+        "Persona actualizada: " +
+          persona.nick +
+          " con nueva edad: " +
+          persona.edad
+      );
       res.send(persona);
-    } else {
-      res.send("No existe ese amigo todavía!");
+      return;
     }
   }
+  console.log("Persona no encontrada");
+  res.send("No existe ese amigo todavía!");
 });
 
 // por JSON para actualizar cualquier campo
-app.put("/actualizar/:nombre", function (req, res) {
-  let nombre = req.params.nombre;
-  let persona = new Persona(req.body.nombre, req.body.apellido, req.body.edad);
-  console.log("Nueva persona: " + persona);
+app.put("/actualizar/:nick", function (req, res) {
+  let nick = req.params.nick;
+  let persona = new Persona(
+    req.body.nick,
+    req.body.nombre,
+    req.body.apellido,
+    req.body.edad
+  );
+  console.log("Intentando actualizar persona con nick: " + nick);
   for (let i = 0; i < personas.length; i++) {
-    if (personas[i].nombre === nombre) {
+    if (personas[i].nick === nick) {
       delete personas[i];
       personas[i] = persona;
+      console.log(
+        "Persona actualizada: " +
+          persona.nick +
+          " con nueva edad: " +
+          persona.edad
+      );
       res.send(persona);
       return;
-    } else {
-      res.send("No existe ese amigo todavía!");
     }
   }
+  console.log("Persona no encontrada");
+  res.send("No existe ese amigo todavía!");
 });
 
 app.put("/welcome", function (req, res) {
-  res.send("<b>Holi</b> Bienvenido a mi servidor http hecho con express");
+  res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
 // PROCESANDO CON DELETE BORRAR ALGO
@@ -131,22 +177,24 @@ app.delete("/", function (req, res) {
 });
 
 app.delete("/welcome", function (req, res) {
-  res.send("<b>Holi</b> Bienvenido a mi servidor http hecho con express");
+  res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
 // por parametro url
-app.delete("/borrar/:nombre", function (req, res) {
-  let nombre = req.params.nombre;
+app.delete("/borrar/:nick", function (req, res) {
+  let nombre = req.params.nick;
   let i = 0;
+  console.log("Intentando borrar persona con nick: " + nombre);
   for (let valor of personas) {
-    if (valor.nombre === nombre) {
+    if (valor.nick === nombre) {
       personas.splice(i, 1);
-      res.send("Borrando la persona " + valor.nombre);
+      console.log("Persona borrada: " + nombre);
+      res.send("Borrando la persona " + valor.nick);
       return;
     }
-
     i++;
   }
+  console.log("Persona no encontrada");
   res.send("No existe ese amigo todavía!");
 });
 
