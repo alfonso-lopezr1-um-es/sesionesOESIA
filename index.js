@@ -2,6 +2,9 @@
 import express from "express";
 import Persona from "./Personas.js";
 import bodyParser from "body-parser";
+import crearTabla from "./src/operaciones/crearTabla.js";
+import borrarTabla from "./src/operaciones/borrarTabla.js";
+import insertarDatos from "./src/operaciones/insertardatos.js";
 
 var app = express();
 
@@ -10,9 +13,6 @@ let Juan = new Persona("juan23", "Juan", "Perez", 25);
 personas.push(Juan);
 
 // PROCESANDO CON GET OBTENER ALGO
-
-/*console.log(Juan);
-console.log(personas);*/
 
 // recuperar todos los amigos
 app.get("/amigos", function (req, res) {
@@ -87,7 +87,7 @@ app.post("/welcome", function (req, res) {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// creando nuevos usuarios con JSON
+// creado nuevos usuarios con JSON
 app.post("/crear", (req, res) => {
   let persona = new Persona(
     req.body.nick,
@@ -110,6 +110,16 @@ app.post("/crear", (req, res) => {
   res.send(
     `<p>Se ha creado el amigo! ${persona.nombre} ${persona.apellido} </p>`
   );
+});
+
+app.post("/creartabla", function (req, res) {
+  res.json("<b>Hola!</b> Creada la tabla amigos");
+  crearTabla();
+});
+
+app.post("/insertar", function (req, res) {
+  res.json("<b>Se han insertado amigos en la tabla</b>");
+  insertarDatos();
 });
 
 // PROCESANDO CON PUT ACTUALIZAR ALGO
@@ -196,6 +206,13 @@ app.delete("/borrar/:nick", function (req, res) {
   }
   console.log("Persona no encontrada");
   res.send("No existe ese amigo todavía!");
+});
+
+// operacion para borrar la tabla
+
+app.delete("/borrartabla", function (req, res) {
+  res.json("<b>Se ha borrado la tabla amigos</b>");
+  borrarTabla();
 });
 
 // por JSON, no tiene sentido la vd
