@@ -7,9 +7,9 @@
   "scripts": {
     "lanzar": "nodemon --watch index.js",
     "creartabla": "node creartabla.js",
-    "borrartabla": "node borrartabla.js",
-    "borrartabla2": "node src/borrartabla.js",
-    "insertardatos": "node insertardatos.js"
+    "borrartabla": "node src/operaciones/borrarTabla.js",
+    "borrartabla2": "node src/borrarTabla.js",
+    "insertardatos": "node src/operaciones/insertardatos.js"
   },
   "author": "alfonso",
   "license": "ISC",

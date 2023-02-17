@@ -1,58 +1,27 @@
 // Requerir express y crear una instancia de ello
+import pg from "pg";
 import express from "express";
 import Persona from "./Personas.js";
 import bodyParser from "body-parser";
-import crearTabla from "./src/operaciones/crearTabla.js";
-import borrarTabla from "./src/operaciones/borrarTabla.js";
-import insertarDatos from "./src/operaciones/insertardatos.js";
 
 var app = express();
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
-let personas = [];
-let Juan = new Persona("juan23", "Juan", "Perez", 25);
-personas.push(Juan);
+// creamos el cliente
+const { Client } = pg;
+
+let client = new Client({
+  user: "postgres",
+  host: "localhost",
+  database: "bdserver",
+  password: "alfonso",
+  port: 5432,
+});
+
+client.connect();
 
 // PROCESANDO CON GET OBTENER ALGO
-
-// recuperar todos los amigos
-app.get("/amigos", function (req, res) {
-  let persona;
-  let total = "Lista de amigos registrados:  \n";
-  let i = 1;
-  console.log("Recuperando todas las personas: " + personas);
-  for (let valor of personas) {
-    persona = valor;
-    console.log("Persona recuperada: " + persona.toString());
-    total +=
-      i +
-      ". Nick: " +
-      persona.nick +
-      " Credenciales: " +
-      persona.nombre +
-      " " +
-      persona.apellido +
-      " \n";
-    i++;
-  }
-  res.send(total);
-});
-
-// recuperar un amigo en concreto
-app.get("/amigos/:nick", function (req, res) {
-  let nick = req.params.nick;
-  let persona;
-  console.log("Recuperando persona con nick: " + nick);
-  for (let valor of personas) {
-    if (valor.nick === nick) {
-      console.log("Amigo encontrado: " + valor.toString());
-      persona = valor;
-      res.send(persona);
-      return;
-    }
-  }
-  console.log("Amigo no encontrado");
-  res.send("No existe ese amigo todavía!");
-});
 
 // en la solicitud de root (localhost:3000/)
 app.get("/", function (req, res) {
@@ -73,6 +42,111 @@ app.get("/logo", function (req, res) {
   );
 });
 
+/** 1. Recuperar todos los amigos */
+app.get("/amigos", (req, res) => {
+  console.log("Recuperando todos los amigos");
+  client.query(`SELECT * FROM amigos`, (error, results) => {
+    if (error) {
+      console.log("Error");
+      // Manejar el error de la consulta
+      res
+        .status(500)
+        .send(
+          "Estamos teniendo problemas con la tabla. Vuelva en otro momento!"
+        );
+    }
+    // si hay resultado lo imprimimos
+    else if (results.rows.length > 0) {
+      console.log("Devuelve todos los amigos");
+      // Enviar los resultados de la consulta como respuesta HTTP
+      res.json(results.rows);
+    }
+    // si no lo hay, devolvemos 404
+    else if (results.rows.length === 0) {
+      console.log("No hay amigos todavia");
+      res.status(401).send("<b>404.</b> No existe ningún amigo todavía!");
+    }
+  });
+});
+
+/** 2. Recuperar algunos amigos: solo los mayores de X años  */
+app.get("/amigosmayores/:numero", function (req, res) {
+  let numero = req.params.numero;
+  console.log("Recuperando amigos mayores de " + numero + " años");
+  client.query(
+    `SELECT NICK,  FIRSTNAME, LASTNAME, AGE
+  FROM AMIGOS                                                                
+  WHERE AGE > $1`,
+    [numero],
+    (error, results) => {
+      if (error) {
+        console.log("Error");
+        // Manejar el error de la consulta
+        res
+          .status(500)
+          .send(
+            "Estamos teniendo problemas con la tabla. Vuelva en otro momento!"
+          );
+      }
+      // si hay resultado lo imprimimos
+      else if (results.rows.length > 0) {
+        console.log("Devolviendo resultados");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.json(results.rows);
+      }
+      // si no lo hay, devolvemos 404
+      else if (results.rows.length === 0) {
+        console.log("No existe ningún amigo todavía mayor de esa edad");
+        res
+          .status(404)
+          .send(
+            "<b>404.</b> No existe ningún amigo mayor de " +
+              numero +
+              " todavía!"
+          );
+      }
+    }
+  );
+});
+
+/** 3. Recuperar un amigo en concreto con un id especifico */
+app.get("/amigos/:nick", function (req, res) {
+  let nick = req.params.nick;
+  console.log("Buscando amigo con nick " + nick);
+  client.query(
+    "SELECT * FROM AMIGOS WHERE nick = $1",
+    [nick],
+    (error, results, fields) => {
+      if (error) {
+        console.log("Error");
+        // Manejar el error de la consulta
+        res
+          .status(500)
+          .send(
+            "Estamos teniendo problemas con la tabla. Vuelva en otro momento!"
+          );
+      }
+      // si hay resultado lo imprimimos
+      else if (results.rows.length > 0) {
+        console.log("Se enccontró al amigo");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.json(results.rows);
+      }
+      // si no lo hay, devolvemos 404
+      else if (results.rows.length === 0) {
+        console.log("No existe ningún amigo con ese nick todavia");
+        res
+          .status(404)
+          .send(
+            "<b>404.</b> No existe ningún amigo con el nick " +
+              nick +
+              " todavía!"
+          );
+      }
+    }
+  );
+});
+
 // PROCESANDO CON POST AÑADIR ALGO
 
 app.post("/", function (req, res) {
@@ -84,72 +158,137 @@ app.post("/welcome", function (req, res) {
   res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+/** 4. Crear la tabla amigos en la BD */
+app.post("/creartabla", function (req, res) {
+  console.log("Creando tabla amigos");
+  client.query(
+    `CREATE TABLE amigos (
+    nick varchar primary key NOT NULL,
+    firstName varchar,
+    lastName varchar,
+    age int);`,
+    (error, results) => {
+      if (error) {
+        console.log("Fallo al crear tabla, probablemente ya existe");
+        // Manejar el error de la consulta
+        res.status(401).send("No se pudo crear la tabla Amigos!\n" + error);
+      }
+      // si hay resultado lo imprimimos
+      else {
+        console.log("Tabla Amigos creada");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.send("Tabla Amigos creada correctamente :D");
+      }
+    }
+  );
+});
 
-// creado nuevos usuarios con JSON
-app.post("/crear", (req, res) => {
+/** 5. Insertar algunos amigos predeterminados en la tabla */
+app.post("/insertaramigos", function (req, res) {
+  console.log("Insertando amigos en la tabla");
+  client.query(
+    `
+INSERT INTO amigos (nick, firstName, lastName, age)
+VALUES ('manolo37', 'Manolo', 'Martinez', 21), ('alfonso13', 'Alfonso', 'Lopez', 23), ('juanHD', 'Juan', 'Hernandez', 13)
+`,
+    (error) => {
+      if (error) {
+        console.log("Fallo al insertar amigos, probablemente ya existen");
+        // Manejar el error de la consulta
+        res.status(500).send("No se pudieron insertar los amigos :(\n" + error);
+      }
+      // si hay resultado lo imprimimos
+      else {
+        console.log("Se insertaron los amigos correctamente");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.send("Se insertaron los amigos correctamente :D");
+      }
+    }
+  );
+});
+
+/** 6. Insertando un nuevo usuario con JSON */
+app.post("/crearamigo", (req, res) => {
+  // Obtenemos el objeto persona del JSON
   let persona = new Persona(
     req.body.nick,
     req.body.nombre,
     req.body.apellido,
     req.body.edad
   );
+
   console.log("Intentando crear nueva persona: " + persona.nick);
-  // comprobamos que no exista ninguno con ese nick
-  for (let valor of personas) {
-    if (valor.nick === persona.nick) {
-      console.log("Ya existe un usuario con ese nick");
 
-      res.send("Ya existe ese amigo!");
-      return;
+  // Definir la consulta SQL preparada
+  const consulta = {
+    text: "INSERT INTO amigos (nick, firstName, lastName, age) VALUES ($1, $2, $3, $4)",
+    values: [persona.nick, persona.nombre, persona.apellido, persona.edad],
+  };
+
+  client.query(consulta, (error, results) => {
+    if (error) {
+      console.log("Fallo al insertar el nuevo amigo, probablemente ya existe");
+      // Manejar el error de la consulta
+      res.status(401).send("No se pudo crear el amigo :(\n" + error);
     }
-  }
-  console.log("Persona creada: " + persona.toString());
-  personas.push(persona);
-  res.send(
-    `<p>Se ha creado el amigo! ${persona.nombre} ${persona.apellido} </p>`
-  );
-});
-
-app.post("/creartabla", function (req, res) {
-  res.json("<b>Hola!</b> Creada la tabla amigos");
-  crearTabla();
-});
-
-app.post("/insertar", function (req, res) {
-  res.json("<b>Se han insertado amigos en la tabla</b>");
-  insertarDatos();
+    // si hay resultado lo imprimimos
+    else {
+      console.log("Se creó el amigo correctamente");
+      // Enviar los resultados de la consulta como respuesta HTTP
+      res.send("Se creó el amigo correctamente :D");
+    }
+  });
 });
 
 // PROCESANDO CON PUT ACTUALIZAR ALGO
 
-// por parametro url para actualizar solo la edad
+app.put("/welcome", function (req, res) {
+  res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
+});
+
+/** 7. Por parametro url para actualizar solo la edad*/
 app.put("/actualizar/:nick/:edad", function (req, res) {
   let nick = req.params.nick;
   let edad = req.params.edad;
-  let persona;
   console.log("Intentando actualizar persona con nick: " + nick);
-
-  for (let valor of personas) {
-    if (valor.nick === nick) {
-      persona = valor;
-      persona.edad = edad;
-      console.log(
-        "Persona actualizada: " +
-          persona.nick +
-          " con nueva edad: " +
-          persona.edad
-      );
-      res.send(persona);
-      return;
+  client.query(
+    ` UPDATE amigos SET age = $1 WHERE nick = $2;`,
+    [edad, nick],
+    (error, results) => {
+      let numModificados = results.rowCount;
+      if (error) {
+        console.log("Fallo al actualizar info de amigo");
+        // Manejar el error de la consulta
+        res.status(500).send("No se pudo actualizar el amigo :(\n" + error);
+      }
+      // si hay resultado lo imprimimos
+      else if (numModificados > 0) {
+        console.log("Se actualizó el amigo correctamente");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.send(
+          "Se actualizó el amigo " +
+            nick +
+            " con la edad " +
+            edad +
+            " correctamente :D"
+        );
+      }
+      // si no lo hay, devolvemos 404
+      else if (numModificados == 0) {
+        console.log("No existe ningún amigo con ese nick todavia");
+        res
+          .status(404)
+          .send(
+            "<b>404.</b> No existe ningún amigo con el nick " +
+              nick +
+              " todavía!"
+          );
+      }
     }
-  }
-  console.log("Persona no encontrada");
-  res.send("No existe ese amigo todavía!");
+  );
 });
 
-// por JSON para actualizar cualquier campo
+/** 8. Por JSON para actualizar cualquier campo*/
 app.put("/actualizar/:nick", function (req, res) {
   let nick = req.params.nick;
   let persona = new Persona(
@@ -158,27 +297,46 @@ app.put("/actualizar/:nick", function (req, res) {
     req.body.apellido,
     req.body.edad
   );
-  console.log("Intentando actualizar persona con nick: " + nick);
-  for (let i = 0; i < personas.length; i++) {
-    if (personas[i].nick === nick) {
-      delete personas[i];
-      personas[i] = persona;
-      console.log(
-        "Persona actualizada: " +
-          persona.nick +
-          " con nueva edad: " +
-          persona.edad
-      );
-      res.send(persona);
-      return;
-    }
-  }
-  console.log("Persona no encontrada");
-  res.send("No existe ese amigo todavía!");
-});
 
-app.put("/welcome", function (req, res) {
-  res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
+  console.log("Intentando actualizar persona con nick: " + nick);
+  client.query(
+    ` UPDATE amigos SET firstname = $1, lastname = $2, age = $3 WHERE nick = $4;`,
+    [persona.nombre, persona.apellido, persona.edad, nick],
+    (error, results) => {
+      let numModificados = results.rowCount;
+      if (error) {
+        console.log("Fallo al actualizar info de amigo");
+        // Manejar el error de la consulta
+        res.status(500).send("No se pudo actualizar el amigo :(\n" + error);
+      }
+      // si hay resultado lo imprimimos
+      else if (numModificados > 0) {
+        console.log("Se actualizó el amigo correctamente");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.send(
+          "Se actualizó el amigo " +
+            nick +
+            "\nNuevo nombre: " +
+            persona.nombre +
+            "\nNuevo apellido: " +
+            persona.apellido +
+            "\nNueva edad: " +
+            persona.edad
+        );
+      }
+      // si no lo hay, devolvemos 404
+      else if (numModificados == 0) {
+        console.log("No existe ningún amigo con ese nick todavia");
+        res
+          .status(404)
+          .send(
+            "<b>404.</b> No existe ningún amigo con el nick " +
+              nick +
+              " todavía!"
+          );
+      }
+    }
+  );
 });
 
 // PROCESANDO CON DELETE BORRAR ALGO
@@ -190,45 +348,59 @@ app.delete("/welcome", function (req, res) {
   res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-// por parametro url
+/** 9. Borrando usuario por parametro URL */
 app.delete("/borrar/:nick", function (req, res) {
-  let nombre = req.params.nick;
-  let i = 0;
-  console.log("Intentando borrar persona con nick: " + nombre);
-  for (let valor of personas) {
-    if (valor.nick === nombre) {
-      personas.splice(i, 1);
-      console.log("Persona borrada: " + nombre);
-      res.send("Borrando la persona " + valor.nick);
-      return;
+  let nick = req.params.nick;
+  console.log("Intentando borrar persona con nick: " + nick);
+  client.query(
+    ` DELETE FROM amigos WHERE nick = $1;`,
+    [nick],
+    (error, results) => {
+      console.log(results);
+      let numModificados = results.rowCount;
+      if (error) {
+        console.log("Fallo al eliminar amigo");
+        // Manejar el error de la consulta
+        res.status(500).send("No se pudo eliminar el amigo :(\n" + error);
+      }
+      // si hay resultado lo imprimimos
+      else if (numModificados > 0) {
+        console.log("Se eliminó el amigo correctamente");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.send("Se eliminó el amigo " + nick);
+      }
+      // si no lo hay, devolvemos 404
+      else if (numModificados == 0) {
+        console.log("No existe ningún amigo con ese nick todavia");
+        res
+          .status(404)
+          .send(
+            "<b>404.</b> No existe ningún amigo con el nick " +
+              nick +
+              " todavía!"
+          );
+      }
     }
-    i++;
-  }
-  console.log("Persona no encontrada");
-  res.send("No existe ese amigo todavía!");
+  );
 });
 
-// operacion para borrar la tabla
-
+/** 10. Borrar la tabla amigos entera */
 app.delete("/borrartabla", function (req, res) {
-  res.json("<b>Se ha borrado la tabla amigos</b>");
-  borrarTabla();
-});
-
-// por JSON, no tiene sentido la vd
-/*
-app.delete("/borrar", function (req, res) {
-  let persona = new Persona(req.body.nombre, req.body.apellido, req.body.edad);
-
-  for (let i = 0; i < personas.length; i++) {
-    if (personas[i].nombre === persona.nombre) {
-      personas.splice(i, 1);
-      res.send("Borrando la persona " + personas[i].nombre);
-      return;
+  console.log("Borrando tabla amigos");
+  client.query(`DROP TABLE amigos`, (error) => {
+    if (error) {
+      console.log("Fallo al borrar la tabla, probablemente ya no existe");
+      // Manejar el error de la consulta
+      res.status(404).send("No se pudo borrar la tabla Amigos!\n" + error);
     }
-    res.send("No existe ese amigo todavía!");
-  }
-});*/
+    // si hay resultado lo imprimimos
+    else {
+      console.log("Tabla Amigos borrada");
+      // Enviar los resultados de la consulta como respuesta HTTP
+      res.send("Tabla Amigos borrada correctamente :D");
+    }
+  });
+});
 
 // Cambiar el mensaje 404 cuando una peticion sea incorrecta
 app.use(function (req, res, next) {
