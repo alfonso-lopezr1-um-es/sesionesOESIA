@@ -3,6 +3,8 @@ import pg from "pg";
 import express from "express";
 import Persona from "./Personas.js";
 import bodyParser from "body-parser";
+import * as dotenv from "dotenv";
+dotenv.config();
 
 var app = express();
 app.use(bodyParser.json());
@@ -12,11 +14,11 @@ app.use(bodyParser.urlencoded({ extended: false }));
 const { Client } = pg;
 
 let client = new Client({
-  user: "postgres",
-  host: "localhost",
-  database: "bdserver",
-  password: "alfonso",
-  port: 5432,
+  user: process.env.NOMBRE,
+  host: process.env.HOST,
+  database: process.env.DATABASE,
+  password: process.env.PASS,
+  port: process.env.PORT,
 });
 
 client.connect();
@@ -33,6 +35,10 @@ app.get("/welcome", function (req, res) {
   res.json("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
+app.get("/prueba", function (req, res) {
+  res.send("holaa" + process.env.SAMPLE_DATA);
+});
+
 // get logo
 app.get("/logo", function (req, res) {
   res.send(
@@ -40,6 +46,12 @@ app.get("/logo", function (req, res) {
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTpSpqW52pcUJWsYi9QUzDmuybTM_gxPE5f0ksmMw1XRA5bxN-E62fGA_8E-44Gf2g7mTA&usqp=CAU" +
       "></img>"
   );
+});
+
+app.get("/cerrar", function (req, res) {
+  client.end();
+  console.log("Connection closed");
+  res.json("Conexión cerrada");
 });
 
 /** 1. Recuperar todos los amigos */
@@ -356,7 +368,6 @@ app.delete("/borrar/:nick", function (req, res) {
     ` DELETE FROM amigos WHERE nick = $1;`,
     [nick],
     (error, results) => {
-      console.log(results);
       let numModificados = results.rowCount;
       if (error) {
         console.log("Fallo al eliminar amigo");
