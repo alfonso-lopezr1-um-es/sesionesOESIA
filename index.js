@@ -32,15 +32,15 @@ client.connect();
 
 // Funcion para verificar si el token proporcionado es valido a la hora de realizar una solicitud
 const verificarToken = (req, res, next) => {
-  const token = req.headers["authorization"];
+  let token = req.headers["authorization"];
 
   if (!token) {
     return res.status(401).send("No se proporcionó un token de autenticación.");
   }
 
   try {
-    const tokenSinBearer = token.replace("Bearer ", ""); // Remover la palabra "Bearer" del encabezado que si no no va
-    const decoded = jwt.verify(tokenSinBearer, process.env.SECRET_KEY); // Verificar token
+    let tokenSinBearer = token.replace("Bearer ", ""); // Remover la palabra "Bearer" del encabezado que si no no va
+    let decoded = jwt.verify(tokenSinBearer, process.env.SECRET_KEY); // Verificar token
     next();
   } catch (ex) {
     res.status(400).send("Token no válido.");
@@ -60,7 +60,7 @@ app.get("/welcome", function (req, res) {
   res.json("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-//Prueba de dotEnv para variables de entorno
+//Prueba de alguna funcionalidad, no usar, es solo para testear la funcionalidad
 app.get("/prueba", verificarToken, (req, res) => {
   client.query(
     `SELECT NICK, FIRSTNAME, LASTNAME, AGE FROM AMIGOS WHERE AGE > 10`,
@@ -132,11 +132,7 @@ app.get("/amigosmayores/:numero", function (req, res) {
       if (error) {
         console.log("Error");
         // Manejar el error de la consulta
-        res
-          .status(500)
-          .send(
-            "Estamos teniendo problemas con la tabla. Vuelva en otro momento!"
-          );
+        res.status(500).send("Petición incorrecta! Introduce un numero");
       }
       // si hay resultado lo imprimimos
       else if (results.rows.length > 0) {
@@ -258,8 +254,8 @@ app.post("/insertaramigos", function (req, res) {
   );
 });
 
-/** 6. Insertando un nuevo usuario con JSON */
-app.post("/crearamigo", (req, res) => {
+/** 6. Insertando un nuevo usuario con JSON, deberemos de habernos autenticado previamente */
+app.post("/crearamigo", verificarToken, (req, res) => {
   // Obtenemos el objeto persona del JSON
   let persona = new Persona(
     req.body.nick,
@@ -272,7 +268,7 @@ app.post("/crearamigo", (req, res) => {
   console.log("Intentando crear nueva persona: " + persona.nick);
 
   // Definir la consulta SQL preparada
-  const consulta = {
+  let consulta = {
     text: "INSERT INTO amigos (nick, firstName, lastName, password, age) VALUES ($1, $2, $3, $4, $5)",
     values: [
       persona.nick,
@@ -300,8 +296,8 @@ app.post("/crearamigo", (req, res) => {
 
 /** 7. Ruta para obtener el token de autenticación de usuario */
 app.post("/login", async (req, res) => {
-  const usuario = req.body.nick;
-  const contraseña = req.body.password;
+  let usuario = req.body.nick;
+  let contraseña = req.body.password;
   console.log(
     "Intentando autenticar usuario: " +
       usuario +
@@ -309,16 +305,16 @@ app.post("/login", async (req, res) => {
       contraseña
   );
 
-  const query = "SELECT * FROM amigos WHERE nick = $1 AND password = $2";
-  const values = [usuario, contraseña];
-  const { rows } = await client.query(query, values);
+  let query = "SELECT * FROM amigos WHERE nick = $1 AND password = $2";
+  let values = [usuario, contraseña];
+  let { rows } = await client.query(query, values);
 
   if (rows.length === 0) {
     console.log("Credenciales incorrectas");
-    return res.status(401).json({ mensaje: "Credenciales incorrectas" });
+    return res.status(401).send("Credenciales incorrectas");
   }
-  const datos = { id: rows[0].nick, pass: rows[0].password };
-  const token = generarToken(datos);
+  let datos = { id: rows[0].nick, pass: rows[0].password };
+  let token = generarToken(datos);
   console.log("Token generado");
   res.json({ token });
 });
@@ -338,6 +334,7 @@ app.put("/actualizar/:nick/:edad", function (req, res) {
     ` UPDATE amigos SET age = $1 WHERE nick = $2;`,
     [edad, nick],
     (error, results) => {
+      console.log(edad.type);
       let numModificados = results.rowCount;
       if (error) {
         console.log("Fallo al actualizar info de amigo");
@@ -432,8 +429,8 @@ app.delete("/welcome", function (req, res) {
   res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-/** 10. Borrando usuario por parametro URL */
-app.delete("/borrar/:nick", function (req, res) {
+/** 10. Borrando usuario por parametro URL, se requiere autenticación */
+app.delete("/borrar/:nick", verificarToken, function (req, res) {
   let nick = req.params.nick;
   console.log("Intentando borrar persona con nick: " + nick);
   client.query(
