@@ -5,11 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "lanzar": "nodemon --watch index.js",
-    "creartabla": "node creartabla.js",
-    "borrartabla": "node src/operaciones/borrarTabla.js",
-    "borrartabla2": "node src/borrarTabla.js",
-    "insertardatos": "node src/operaciones/insertardatos.js"
+    "lanzar": "nodemon --watch index.js"
   },
   "author": "alfonso",
   "license": "ISC",

@@ -1,17 +1,23 @@
-// Requerir express y crear una instancia de ello
 import pg from "pg";
 import express from "express";
 import Persona from "./Personas.js";
 import bodyParser from "body-parser";
 import * as dotenv from "dotenv";
-dotenv.config();
+import generarToken from "./generateToken.js";
+import jwt from "jsonwebtoken";
 
+// Requerir express y crear una instancia de ello
 var app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// Tmb dotEnv
+dotenv.config();
+
 // creamos el cliente
 const { Client } = pg;
+
+// Parametros de conexion a la base de datos pasamos por variables de entorno
 
 let client = new Client({
   user: process.env.NOMBRE,
@@ -21,13 +27,32 @@ let client = new Client({
   port: process.env.PORT,
 });
 
+// Se crea la conexion a la base de datos
 client.connect();
+
+// Funcion para verificar si el token proporcionado es valido a la hora de realizar una solicitud
+const verificarToken = (req, res, next) => {
+  const token = req.headers["authorization"];
+
+  if (!token) {
+    return res.status(401).send("No se proporcionó un token de autenticación.");
+  }
+
+  try {
+    const tokenSinBearer = token.replace("Bearer ", ""); // Remover la palabra "Bearer" del encabezado que si no no va
+    const decoded = jwt.verify(tokenSinBearer, process.env.SECRET_KEY); // Verificar token
+    next();
+  } catch (ex) {
+    res.status(400).send("Token no válido.");
+    console.log("Token no válido.");
+  }
+};
 
 // PROCESANDO CON GET OBTENER ALGO
 
 // en la solicitud de root (localhost:3000/)
 app.get("/", function (req, res) {
-  res.send("<b> Mi </b> primer servidor http express");
+  res.send("<b> Mi primer servidor http express </b>");
 });
 
 // En localhost:3000/welcome
@@ -35,11 +60,28 @@ app.get("/welcome", function (req, res) {
   res.json("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-app.get("/prueba", function (req, res) {
-  res.send("holaa" + process.env.SAMPLE_DATA);
+//Prueba de dotEnv para variables de entorno
+app.get("/prueba", verificarToken, (req, res) => {
+  client.query(
+    `SELECT NICK, FIRSTNAME, LASTNAME, AGE FROM AMIGOS WHERE AGE > 10`,
+    (error, results) => {
+      if (error) {
+        console.log("Error");
+        // Manejar el error de la consulta
+        res
+          .status(500)
+          .send(
+            "Estamos teniendo problemas con la tabla. Vuelva en otro momento!"
+          );
+      } else {
+        console.log("Devolviendo resultados");
+        res.json(results.rows);
+      }
+    }
+  );
 });
 
-// get logo
+// get logo para mostrar una imagen en la pantalla
 app.get("/logo", function (req, res) {
   res.send(
     "<img src=" +
@@ -61,11 +103,7 @@ app.get("/amigos", (req, res) => {
     if (error) {
       console.log("Error");
       // Manejar el error de la consulta
-      res
-        .status(500)
-        .send(
-          "Estamos teniendo problemas con la tabla. Vuelva en otro momento!"
-        );
+      res.status(500).send("No existe la tabla de amigos todavía, créala!");
     }
     // si hay resultado lo imprimimos
     else if (results.rows.length > 0) {
@@ -178,6 +216,7 @@ app.post("/creartabla", function (req, res) {
     nick varchar primary key NOT NULL,
     firstName varchar,
     lastName varchar,
+    password varchar,
     age int);`,
     (error, results) => {
       if (error) {
@@ -199,10 +238,10 @@ app.post("/creartabla", function (req, res) {
 app.post("/insertaramigos", function (req, res) {
   console.log("Insertando amigos en la tabla");
   client.query(
-    `
-INSERT INTO amigos (nick, firstName, lastName, age)
-VALUES ('manolo37', 'Manolo', 'Martinez', 21), ('alfonso13', 'Alfonso', 'Lopez', 23), ('juanHD', 'Juan', 'Hernandez', 13)
-`,
+    `INSERT INTO amigos (nick, firstName, lastName, password, age) VALUES 
+('manolo37', 'Manolo', 'Martinez', 'limon', '21'), 
+('alfonso13', 'Alfonso', 'Lopez', 'naranja', 23), 
+('juanHD', 'Juan', 'Hernandez', 'pera', '13')`,
     (error) => {
       if (error) {
         console.log("Fallo al insertar amigos, probablemente ya existen");
@@ -224,17 +263,24 @@ app.post("/crearamigo", (req, res) => {
   // Obtenemos el objeto persona del JSON
   let persona = new Persona(
     req.body.nick,
-    req.body.nombre,
-    req.body.apellido,
-    req.body.edad
+    req.body.firstname,
+    req.body.lastname,
+    req.body.password,
+    req.body.age
   );
 
   console.log("Intentando crear nueva persona: " + persona.nick);
 
   // Definir la consulta SQL preparada
   const consulta = {
-    text: "INSERT INTO amigos (nick, firstName, lastName, age) VALUES ($1, $2, $3, $4)",
-    values: [persona.nick, persona.nombre, persona.apellido, persona.edad],
+    text: "INSERT INTO amigos (nick, firstName, lastName, password, age) VALUES ($1, $2, $3, $4, $5)",
+    values: [
+      persona.nick,
+      persona.nombre,
+      persona.apellido,
+      persona.password,
+      persona.edad,
+    ],
   };
 
   client.query(consulta, (error, results) => {
@@ -252,13 +298,38 @@ app.post("/crearamigo", (req, res) => {
   });
 });
 
+/** 7. Ruta para obtener el token de autenticación de usuario */
+app.post("/login", async (req, res) => {
+  const usuario = req.body.nick;
+  const contraseña = req.body.password;
+  console.log(
+    "Intentando autenticar usuario: " +
+      usuario +
+      " con contraseña: " +
+      contraseña
+  );
+
+  const query = "SELECT * FROM amigos WHERE nick = $1 AND password = $2";
+  const values = [usuario, contraseña];
+  const { rows } = await client.query(query, values);
+
+  if (rows.length === 0) {
+    console.log("Credenciales incorrectas");
+    return res.status(401).json({ mensaje: "Credenciales incorrectas" });
+  }
+  const datos = { id: rows[0].nick, pass: rows[0].password };
+  const token = generarToken(datos);
+  console.log("Token generado");
+  res.json({ token });
+});
+
 // PROCESANDO CON PUT ACTUALIZAR ALGO
 
 app.put("/welcome", function (req, res) {
   res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-/** 7. Por parametro url para actualizar solo la edad*/
+/** 8. Por parametro url para actualizar solo la edad*/
 app.put("/actualizar/:nick/:edad", function (req, res) {
   let nick = req.params.nick;
   let edad = req.params.edad;
@@ -300,20 +371,21 @@ app.put("/actualizar/:nick/:edad", function (req, res) {
   );
 });
 
-/** 8. Por JSON para actualizar cualquier campo*/
+/** 9. Por JSON para actualizar cualquier campo*/
 app.put("/actualizar/:nick", function (req, res) {
   let nick = req.params.nick;
   let persona = new Persona(
     req.body.nick,
-    req.body.nombre,
-    req.body.apellido,
-    req.body.edad
+    req.body.firstname,
+    req.body.lastname,
+    req.body.password,
+    req.body.age
   );
 
   console.log("Intentando actualizar persona con nick: " + nick);
   client.query(
-    ` UPDATE amigos SET firstname = $1, lastname = $2, age = $3 WHERE nick = $4;`,
-    [persona.nombre, persona.apellido, persona.edad, nick],
+    ` UPDATE amigos SET firstname = $1, lastname = $2, age = $4, password =$3 WHERE nick = $5;`,
+    [persona.nombre, persona.apellido, persona.password, persona.edad, nick],
     (error, results) => {
       let numModificados = results.rowCount;
       if (error) {
@@ -360,7 +432,7 @@ app.delete("/welcome", function (req, res) {
   res.send("<b>Hola!</b> Bienvenido a mi servidor http hecho con express");
 });
 
-/** 9. Borrando usuario por parametro URL */
+/** 10. Borrando usuario por parametro URL */
 app.delete("/borrar/:nick", function (req, res) {
   let nick = req.params.nick;
   console.log("Intentando borrar persona con nick: " + nick);
@@ -395,7 +467,7 @@ app.delete("/borrar/:nick", function (req, res) {
   );
 });
 
-/** 10. Borrar la tabla amigos entera */
+/** 11. Borrar la tabla amigos entera */
 app.delete("/borrartabla", function (req, res) {
   console.log("Borrando tabla amigos");
   client.query(`DROP TABLE amigos`, (error) => {
