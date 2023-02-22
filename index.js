@@ -5,6 +5,7 @@ import bodyParser from "body-parser";
 import * as dotenv from "dotenv";
 import generarToken from "./generateToken.js";
 import jwt from "jsonwebtoken";
+import cors from "cors";
 
 // Requerir express y crear una instancia de ello
 var app = express();
@@ -29,6 +30,14 @@ let client = new Client({
 
 // Se crea la conexion a la base de datos
 client.connect();
+
+// CORS para permitir peticiones desde el front
+const corsOptions = {
+  origin: "http://localhost:4200",
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 
 // Funcion para verificar si el token proporcionado es valido a la hora de realizar una solicitud
 const verificarToken = (req, res, next) => {
@@ -92,7 +101,7 @@ app.get("/logo", function (req, res) {
 
 app.get("/cerrar", function (req, res) {
   client.end();
-  console.log("Connection closed");
+  console.log("Conexión cerrada");
   res.json("Conexión cerrada");
 });
 
@@ -103,7 +112,7 @@ app.get("/amigos", (req, res) => {
     if (error) {
       console.log("Error");
       // Manejar el error de la consulta
-      res.status(500).send("No existe la tabla de amigos todavía, créala!");
+      res.status(500).send(`Error al recuperar amigos: ${error.message}`);
     }
     // si hay resultado lo imprimimos
     else if (results.rows.length > 0) {
@@ -112,9 +121,9 @@ app.get("/amigos", (req, res) => {
       res.json(results.rows);
     }
     // si no lo hay, devolvemos 404
-    else if (results.rows.length === 0) {
+    else {
       console.log("No hay amigos todavia");
-      res.status(401).send("<b>404.</b> No existe ningún amigo todavía!");
+      res.status(404).send("<b>404.</b> No existe ningún amigo todavía!");
     }
   });
 });
@@ -150,6 +159,36 @@ app.get("/amigosmayores/:numero", function (req, res) {
               numero +
               " todavía!"
           );
+      }
+    }
+  );
+});
+
+/** 2.2 Recuperar algunos amigos: solo los mayores de edad  */
+app.get("/amigosmayores", function (req, res) {
+  console.log("Recuperando amigos mayores de edad");
+  client.query(
+    `SELECT NICK,  FIRSTNAME, LASTNAME, AGE
+  FROM AMIGOS                                                                
+  WHERE AGE > 17`,
+    (error, results) => {
+      if (error) {
+        console.log("Error");
+        // Manejar el error de la consulta
+        res.status(500).send("Petición incorrecta! Introduce un numero");
+      }
+      // si hay resultado lo imprimimos
+      else if (results.rows.length > 0) {
+        console.log("Devolviendo resultados");
+        // Enviar los resultados de la consulta como respuesta HTTP
+        res.json(results.rows);
+      }
+      // si no lo hay, devolvemos 404
+      else if (results.rows.length === 0) {
+        console.log("No existe ningún amigo todavía mayor de edad");
+        res
+          .status(404)
+          .send("<b>404.</b> No existe ningún amigo mayor de edad todavía!");
       }
     }
   );
@@ -311,7 +350,7 @@ app.post("/login", async (req, res) => {
 
   if (rows.length === 0) {
     console.log("Credenciales incorrectas");
-    return res.status(401).send("Credenciales incorrectas");
+    return res.status(401).json("Credenciales incorrectas");
   }
   let datos = { id: rows[0].nick, pass: rows[0].password };
   let token = generarToken(datos);
@@ -334,7 +373,6 @@ app.put("/actualizar/:nick/:edad", function (req, res) {
     ` UPDATE amigos SET age = $1 WHERE nick = $2;`,
     [edad, nick],
     (error, results) => {
-      console.log(edad.type);
       let numModificados = results.rowCount;
       if (error) {
         console.log("Fallo al actualizar info de amigo");
