@@ -1,0 +1,24 @@
+<h2>Crea un nuevo amigo</h2>
+<form (submit)="onSubmit(nick.value, firstname.value, lastname.value, password.value, age.value)">
+  <div>
+    <label for="nick-usuario">Nick de usuario:</label>
+    <input type="text" #nick />
+  </div>
+  <div>
+    <label for="nombre-usuario">Nombre:</label>
+    <input type="text" #firstname />
+  </div>
+  <div>
+    <label for="apellido-usuario">Apellido:</label>
+    <input type="text" #lastname />
+  </div>
+  <div>
+    <label for="pass-usuario">Contraseña:</label>
+    <input type="text" #password />
+  </div>
+  <div>
+    <label for="edad-usuario">Edad:</label>
+    <input type="number" #age />
+  </div>
+  <button type="submit">Crear usuario</button>
+</form>

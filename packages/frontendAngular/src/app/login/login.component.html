@@ -1,0 +1,8 @@
+<h2>Pestaña login</h2>
+<form (submit)="onSubmit(nick.value, password.value)">
+  <input type="text" #nick />
+  <input type="password" #password />
+  <button type="submit">Login</button>
+</form>
+<div *ngIf="respuesta">{{ respuesta }}</div>
+

@@ -1,0 +1,12 @@
+<h2>Actualizar edad de un amigo</h2>
+<form (submit)="onSubmit(nick.value, edad.value)">
+  <div>
+    <label for="nombre-usuario">Nick de usuario:</label>
+    <input type="text" #nick />
+  </div>
+  <div>
+    <label for="edad-usuario">Nueva edad:</label>
+    <input type="text" #edad />
+  </div>
+  <button type="submit">Actualizar usuario</button>
+</form>
