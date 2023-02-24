@@ -1,0 +1,29 @@
+{
+  "name": "serverpruebas",
+  "version": "1.0.0",
+  "description": "Servidor de pruebas formacion",
+  "main": "index.js",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "lanzar": "nodemon --watch index.js"
+  },
+  "author": "alfonso",
+  "license": "ISC",
+  "dependencies": {
+    "@nestjs/jwt": "^10.0.2",
+    "@nestjs/passport": "^9.0.3",
+    "bcrypt": "^5.1.0",
+    "dotenv": "^8.0.0",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "passport": "^0.6.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.9.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.28.0", 
+    "cors": "^2.8.5"
+  }
+}
